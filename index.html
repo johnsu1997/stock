@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>台股處置股票監控儀表板</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-6">
+  <div class="max-w-6xl mx-auto">
+    <header class="flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b border-slate-700 gap-4">
+      <div>
+        <h1 class="text-2xl font-bold tracking-tight text-white">台股處置股票每日監控</h1>
+        <p class="text-xs text-slate-400 mt-1" id="update-time">資料更新時間：等待 GitHub Actions 首次抓取...</p>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="filterTable('all')" class="px-3 py-1 text-sm bg-slate-700 hover:bg-slate-600 rounded">全部</button>
+        <button onclick="filterTable('futures')" class="px-3 py-1 text-sm bg-indigo-600 hover:bg-indigo-500 rounded">有股期</button>
+        <button onclick="filterTable('repeat')" class="px-3 py-1 text-sm bg-rose-700 hover:bg-rose-600 rounded">累犯</button>
+      </div>
+    </header>
+
+    <div class="mt-6 overflow-x-auto bg-slate-800 rounded-lg shadow">
+      <table class="min-w-full text-left text-sm">
+        <thead class="bg-slate-950 text-slate-400 uppercase text-xs">
+          <tr>
+            <th class="px-4 py-3">代號 / 名稱</th>
+            <th class="px-4 py-3">市場</th>
+            <th class="px-4 py-3">次數性質</th>
+            <th class="px-4 py-3">撮合間隔</th>
+            <th class="px-4 py-3">個股期貨</th>
+            <th class="px-4 py-3">處置期間</th>
+          </tr>
+        </thead>
+        <tbody id="table-body" class="divide-y divide-slate-700">
+          <tr><td colspan="6" class="text-center py-8 text-slate-400">目前尚無資料。請等待晚間系統自動更新，或於 GitHub 手動觸發 Action。</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    let stockData = [];
+    async function loadData() {
+      try {
+        const res = await fetch('data.json?t=' + new Date().getTime());
+        const json = await res.json();
+        stockData = json.data;
+        document.getElementById('update-time').innerText = `資料更新時間：${json.updated_at}`;
+        render(stockData);
+      } catch (err) {
+        console.log("No data.json found yet.");
+      }
+    }
+    function render(list) {
+      const tbody = document.getElementById('table-body');
+      if(list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-slate-400">尚無處置股資料</td></tr>';
+        return;
+      }
+      tbody.innerHTML = list.map(item => `
+        <tr class="hover:bg-slate-750 transition">
+          <td class="px-4 py-3 font-semibold text-white">${item.code} ${item.name}</td>
+          <td class="px-4 py-3 text-slate-400">${item.market}</td>
+          <td class="px-4 py-3">
+            <span class="px-2 py-0.5 text-xs rounded font-bold ${item.is_repeat ? 'bg-rose-900 text-rose-300 border border-rose-600' : 'bg-emerald-900 text-emerald-300'}">
+              ${item.is_repeat ? '累犯 (' + item.punish_count + '次)' : '初犯'}
+            </span>
+          </td>
+          <td class="px-4 py-3">
+            <span class="px-2 py-0.5 text-xs rounded font-semibold ${item.interval === '20分' ? 'bg-amber-900 text-amber-200' : 'bg-slate-700 text-slate-300'}">
+              ${item.interval}
+            </span>
+          </td>
+          <td class="px-4 py-3">
+            ${item.has_futures 
+              ? '<span class="text-indigo-400 font-bold">✔ 支援股期</span>' 
+              : '<span class="text-slate-500">無</span>'}
+          </td>
+          <td class="px-4 py-3 text-slate-300 text-xs">${item.period}</td>
+        </tr>
+      `).join('');
+    }
+    function filterTable(type) {
+      if (type === 'futures') render(stockData.filter(x => x.has_futures));
+      else if (type === 'repeat') render(stockData.filter(x => x.is_repeat));
+      else render(stockData);
+    }
+    loadData();
+  </script>
+</body>
+</html>
